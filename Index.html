@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html dir="rtl">
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; direction: rtl; max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { color: #2c3e50; text-align: center; }
+    #addForm { background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    input, button { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; }
+    button { background: #3498db; color: white; cursor: pointer; }
+    button:hover { background: #2980b9; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 12px; text-align: right; border-bottom: 1px solid #ddd; }
+    th { background-color: #3498db; color: white; }
+    tr:hover { background-color: #f5f5f5; }
+    .purchased { text-decoration: line-through; color: #888; }
+    .actions button { padding: 5px 10px; margin: 0 2px; }
+    .delete-btn { background: #e74c3c; }
+    .purchase-btn { background: #2ecc71; }
+  </style>
+</head>
+<body>
+  <h1>قائمة التسوق المشتركة</h1>
+  
+  <form id="addForm">
+    <input type="text" id="item" placeholder="اسم المادة" required>
+    <input type="text" id="quantity" placeholder="الكمية">
+    <button type="submit">إضافة إلى القائمة</button>
+  </form>
+  
+  <div id="itemsList">
+    <table>
+      <thead>
+        <tr>
+          <th>المادة</th>
+          <th>الكمية</th>
+          <th>الحالة</th>
+          <th>الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="itemsTableBody">
+      </tbody>
+    </table>
+  </div>
+  
+  <script>
+    // تسجيل Service Worker
+    if('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.error('SW registration failed'));
+    }
+
+    // تخزين محلي للبيانات
+    let localItems = JSON.parse(localStorage.getItem('shoppingList')) || [];
+    
+    // تحميل البيانات
+    function loadItems() {
+      if(navigator.onLine) {
+        google.script.run.withSuccessHandler(updateAndCache).getItems();
+      } else {
+        updateItemsList(localItems);
+      }
+    }
+
+    // تحديث البيانات مع التخزين المحلي
+    function updateAndCache(items) {
+      localStorage.setItem('shoppingList', JSON.stringify(items));
+      updateItemsList(items);
+    }
+
+    // إضافة عنصر مع التخزين المحلي
+    function addItemOffline(item, quantity) {
+      const newItem = [item, quantity, "غير مشترى", new Date().toISOString()];
+      localItems.push(newItem);
+      localStorage.setItem('shoppingList', JSON.stringify(localItems));
+      
+      if(navigator.onLine) {
+        syncPendingChanges();
+      }
+    }
+
+    // مزامنة التغييرات عند عودة الاتصال
+    function syncPendingChanges() {
+      const pendingItems = JSON.parse(localStorage.getItem('pendingChanges')) || [];
+      
+      pendingItems.forEach(item => {
+        google.script.run.addItem(item[0], item[1]);
+      });
+      
+      localStorage.removeItem('pendingChanges');
+      loadItems();
+    }
+
+    // كاشيه التطبيق (service-worker.js)
+    const CACHE_NAME = 'shopping-list-v1';
+    const urlsToCache = [
+      '/',
+      '/styles.css',
+      '/app.js'
+    ];
+
+    self.addEventListener('install', event => {
+      event.waitUntil(
+        caches.open(CACHE_NAME)
+          .then(cache => cache.addAll(urlsToCache))
+      );
+    });
+
+    self.addEventListener('fetch', event => {
+      event.respondWith(
+        caches.match(event.request)
+          .then(response => response || fetch(event.request))
+      );
+    });
+
+    // كشف تغير حالة الاتصال
+    window.addEventListener('online', syncPendingChanges);
+  </script>
+</body>
+</html>

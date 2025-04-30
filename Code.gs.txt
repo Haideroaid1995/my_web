@@ -1,0 +1,30 @@
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('قائمة تسوق متزامنة')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+
+function getItems() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('قائمة التسوق');
+  return sheet.getDataRange().getValues();
+}
+
+function addItem(item, quantity) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('قائمة التسوق');
+  sheet.appendRow([item, quantity, "غير مشترى"]);
+  return getItems();
+}
+
+function deleteItem(rowIndex) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('قائمة التسوق');
+  sheet.deleteRow(rowIndex);
+  return getItems();
+}
+
+function markAsPurchased(rowIndex) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('قائمة التسوق');
+  sheet.getRange(rowIndex, 3).setValue("تم الشراء");
+  return getItems();
+}
